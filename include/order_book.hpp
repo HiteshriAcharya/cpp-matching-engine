@@ -27,4 +27,22 @@ public:
             asks_[order.price].push_back(order);
         }
     }
+
+    const Order* bestBid() const{
+
+        if(bids_.empty())
+            return nullptr;
+        
+        auto it = bids_.begin();
+        return &it->second.front();
+    }
+
+    const Order* bestAsk() const{
+
+        if(asks_.empty())
+            return nullptr;
+
+        auto it = asks_.begin();
+        return &it->second.front();
+    }
 };
