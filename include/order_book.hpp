@@ -87,6 +87,26 @@ private:
         return trades;
     }
 
+    bool cancelFromBook(auto& book, std::uint64_t orderId) {
+        for (auto levelIt = book.begin(); levelIt != book.end(); ++levelIt) {
+            auto& orders = levelIt->second;
+
+            for (auto orderIt = orders.begin(); orderIt != orders.end(); ++orderIt) {
+                if (orderIt->id == orderId) {
+                    orders.erase(orderIt);
+
+                    if (orders.empty()) {
+                        book.erase(levelIt);
+                    }
+
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
 public:
 
     OrderBook() = default;
@@ -101,7 +121,7 @@ public:
     void addOrder(const Order& order){
         if(order.side == Side::Buy){
             bids_[order.price].push_back(order);
-        } else{
+        } else if(order.side == Side::Sell){
             asks_[order.price].push_back(order);
         }
     }
@@ -127,7 +147,15 @@ public:
     std::vector<Trade> processOrder(Order order){
         if(order.side == Side::Buy)
             return matchBuyOrder(order);
-        else
+        else if(order.side == Side::Sell)
             return matchSellOrder(order);
+    }
+
+    bool cancelOrder(std::uint64_t orderId) {
+        if (cancelFromBook(bids_, orderId)) {
+            return true;
+        }
+
+        return cancelFromBook(asks_, orderId);
     }
 };
