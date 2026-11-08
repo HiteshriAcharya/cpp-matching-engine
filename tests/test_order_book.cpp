@@ -118,6 +118,46 @@ void testMultiFill(){
     assert(book.bestBid() == nullptr);
 }
 
+void testCancelAsk(){
+    OrderBook book;
+
+    book.addOrder({1, Side::Buy, 100, 15});
+    book.addOrder({2, Side::Buy, 100, 5});
+
+    bool cancelled = book.cancelOrder(2);
+
+    assert(cancelled == true);
+    assert(book.bestBid() != nullptr);
+    assert(book.bestBid()->id == 1);
+}
+
+void testCancelNonExistentOrder(){
+    OrderBook book;
+
+    book.addOrder({1, Side::Buy, 100, 10});
+
+    assert(book.cancelOrder(999) == false);
+    assert(book.bestBid() != nullptr);
+    assert(book.bestBid()->id == 1);
+}
+
+void testCancelMiddleOrderAtSamePrice(){
+    OrderBook book;
+
+    book.addOrder({1, Side::Buy, 100, 10});
+    book.addOrder({2, Side::Buy, 100, 20});
+    book.addOrder({3, Side::Buy, 100, 30});
+
+    assert(book.cancelOrder(2) == true);
+
+    assert(book.bestBid() != nullptr);
+    assert(book.bestBid()->id == 1);
+
+    assert(book.cancelOrder(1) == true);
+
+    assert(book.bestBid()->id == 3);
+}
+
 int main(){
     sequentialTest();
     emptyBookTest();
@@ -125,6 +165,9 @@ int main(){
     testIncomingOrderRestsAfterPartialFill();
     testFullMatch();
     testMultiFill();
+    testCancelAsk();
+    testCancelNonExistentOrder();
+    testCancelMiddleOrderAtSamePrice();
 
     std::cout << "All tests passed \n";
 }

@@ -1,15 +1,28 @@
 #pragma once
+
 #include <map>
-#include <deque>
+#include<unordered_map>
+#include <list>
 #include <vector>
 #include <functional>
+#include <algorithm>
+#include <iterator>
+
 #include "order.hpp"
 #include "trade.hpp"
 
 class OrderBook{
 private:
-    std::map<std::uint64_t, std::deque<Order>, std::greater<std::uint64_t>> bids_; 
-    std::map<std::uint64_t, std::deque<Order>> asks_;
+
+    struct OrderLocation{
+        Side side;
+        std::uint64_t price;
+        std::list<Order>::iterator it;
+    };
+
+    std::map<std::uint64_t, std::list<Order>, std::greater<std::uint64_t>> bids_; 
+    std::map<std::uint64_t, std::list<Order>> asks_;
+    std::unordered_map<std::uint64_t, OrderLocation> orderIndex_; 
 
     std::vector<Trade> matchBuyOrder(Order& order){
         std::vector<Trade> trades;
@@ -34,6 +47,7 @@ private:
             restingAsk.quantity -= tradeQty;
 
             if(restingAsk.quantity == 0){
+                orderIndex_.erase(restingAsk.id);
                 askLevel->second.pop_front();
             }
 
@@ -44,6 +58,8 @@ private:
 
         if(order.quantity > 0){
             bids_[order.price].push_back(order);
+            auto it = std::prev(bids_[order.price].end());
+            orderIndex_[order.id] = {Side::Buy, order.price, it};
         }
 
         return trades;
@@ -72,6 +88,7 @@ private:
             restingBid.quantity -= tradeQty;
 
             if(restingBid.quantity == 0){
+                orderIndex_.erase(restingBid.id);
                 bidLevel->second.pop_front();
             }
 
@@ -82,29 +99,25 @@ private:
 
         if(order.quantity > 0){
             asks_[order.price].push_back(order);
+            auto it = std::prev(asks_[order.price].end());
+            orderIndex_[order.id] = {Side::Sell, order.price, it};
         }
         
         return trades;
     }
 
     bool cancelFromBook(auto& book, std::uint64_t orderId) {
-        for (auto levelIt = book.begin(); levelIt != book.end(); ++levelIt) {
-            auto& orders = levelIt->second;
+        auto indexIt = orderIndex_.find(orderId);
 
-            for (auto orderIt = orders.begin(); orderIt != orders.end(); ++orderIt) {
-                if (orderIt->id == orderId) {
-                    orders.erase(orderIt);
+        auto levelIt = book.find(indexIt->second.price);
 
-                    if (orders.empty()) {
-                        book.erase(levelIt);
-                    }
+        levelIt->second.erase(indexIt->second.it);
+        orderIndex_.erase(indexIt);
 
-                    return true;
-                }
-            }
+        if(levelIt->second.empty()){
+            book.erase(levelIt);
         }
-
-        return false;
+        return true;
     }
 
 public:
@@ -121,8 +134,12 @@ public:
     void addOrder(const Order& order){
         if(order.side == Side::Buy){
             bids_[order.price].push_back(order);
+            auto it = std::prev(bids_[order.price].end());
+            orderIndex_[order.id] = {Side::Buy, order.price, it};
         } else if(order.side == Side::Sell){
             asks_[order.price].push_back(order);
+            auto it = std::prev(asks_[order.price].end());
+            orderIndex_[order.id] = {Side::Sell, order.price, it};
         }
     }
 
@@ -152,10 +169,14 @@ public:
     }
 
     bool cancelOrder(std::uint64_t orderId) {
-        if (cancelFromBook(bids_, orderId)) {
-            return true;
+        auto it = orderIndex_.find(orderId);
+        
+        if(it == orderIndex_.end())
+            return false;
+        
+        if(it->second.side == Side::Buy){
+            return cancelFromBook(bids_, orderId);
         }
-
         return cancelFromBook(asks_, orderId);
     }
 };
