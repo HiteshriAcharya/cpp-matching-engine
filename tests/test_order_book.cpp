@@ -118,7 +118,7 @@ void testMultiFill(){
     assert(book.bestBid() == nullptr);
 }
 
-void testCancelAsk(){
+void testCancelBid(){
     OrderBook book;
 
     book.addOrder({1, Side::Buy, 100, 15});
@@ -155,7 +155,100 @@ void testCancelMiddleOrderAtSamePrice(){
 
     assert(book.cancelOrder(1) == true);
 
+    assert(book.bestBid() != nullptr);
     assert(book.bestBid()->id == 3);
+}
+
+void testModifyDecreaseQuantityKeepsPriority(){
+    OrderBook book;
+
+    book.addOrder({1, Side::Sell, 100, 5});
+    book.addOrder({2, Side::Sell, 100, 10});
+    book.addOrder({3, Side::Sell, 100, 30});
+
+    ModifyResult result = book.modifyOrder(1, 100, 2);
+
+    assert(result.success == true);
+    assert(result.trades.empty() == true);
+
+    assert(book.bestAsk()->id == 1);
+    assert(book.bestAsk()->quantity == 2);
+}
+
+void testModifyIncreaseQuantityLosesPriority(){
+    OrderBook book;
+
+    book.addOrder({1, Side::Sell, 100, 5});
+    book.addOrder({2, Side::Sell, 100, 10});
+    book.addOrder({3, Side::Sell, 100, 30});
+
+    ModifyResult result = book.modifyOrder(1, 100, 90);
+
+    assert(result.success == true);
+    assert(result.trades.empty() == true);
+
+    assert(book.bestAsk()->id == 2);
+    assert(book.bestAsk()->quantity == 10);
+}
+
+void testModifyPriceChangeMovesOrder(){
+    OrderBook book;
+
+    book.addOrder({1, Side::Sell, 100, 5});
+    book.addOrder({2, Side::Sell, 100, 10});
+    book.addOrder({3, Side::Sell, 100, 30});
+    
+    ModifyResult result = book.modifyOrder(1, 140, 90);
+
+    assert(result.success == true);
+    assert(result.trades.empty() == true);
+
+    assert(book.bestAsk()->id == 2);
+    assert(book.bestAsk()->quantity == 10);
+
+    assert(book.cancelOrder(1) == true);
+}
+
+void testModifyPriceChangeTriggersTrade(){
+    OrderBook book;
+
+    book.addOrder({1, Side::Buy, 100, 5});
+    book.addOrder({10, Side::Sell, 105, 5});
+
+    ModifyResult result = book.modifyOrder(1, 110, 5);
+
+    assert(result.success == true);
+    assert(result.trades.size() == 1);
+
+    assert(result.trades.at(0).price == 105);
+    assert(result.trades.at(0).quantity == 5);
+    assert(result.trades.at(0).buyOrderId == 1);
+    assert(result.trades.at(0).sellOrderId == 10);
+
+
+    assert(book.bestAsk() == nullptr);
+    assert(book.bestBid() == nullptr);
+}
+
+void testModifyZeroQuantityCancelsOrder(){
+    OrderBook book;
+
+    book.addOrder({1, Side::Buy, 100, 10});
+
+    ModifyResult result = book.modifyOrder(1, 100, 0);
+
+    assert(result.success == true);
+    assert(result.trades.empty());
+    assert(book.bestBid() == nullptr);
+}
+
+void testModifyNonExistentOrder(){
+    OrderBook book;
+
+    ModifyResult result = book.modifyOrder(999, 100, 10);
+
+    assert(result.success == false);
+    assert(result.trades.empty());
 }
 
 int main(){
@@ -165,9 +258,15 @@ int main(){
     testIncomingOrderRestsAfterPartialFill();
     testFullMatch();
     testMultiFill();
-    testCancelAsk();
+    testCancelBid();
     testCancelNonExistentOrder();
     testCancelMiddleOrderAtSamePrice();
+    testModifyDecreaseQuantityKeepsPriority();
+    testModifyIncreaseQuantityLosesPriority();
+    testModifyPriceChangeMovesOrder();
+    testModifyPriceChangeTriggersTrade();
+    testModifyZeroQuantityCancelsOrder();
+    testModifyNonExistentOrder();
 
     std::cout << "All tests passed \n";
 }

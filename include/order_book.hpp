@@ -120,6 +120,31 @@ private:
         return true;
     }
 
+    ModifyResult modifyOrderFromBook(auto& book, 
+                                     std::uint64_t orderId, 
+                                     std::uint64_t newPrice, 
+                                     std::uint32_t newQuantity)
+    {
+        auto indexIt = orderIndex_.find(orderId);
+
+        Order& existingOrder = *(indexIt->second.it);
+
+        if(existingOrder.price == newPrice 
+            && newQuantity <= existingOrder.quantity)
+        {
+            existingOrder.quantity = newQuantity;
+            return {true, {}};
+        }
+
+        Order updatedOrder = existingOrder;
+        updatedOrder.price = newPrice;
+        updatedOrder.quantity = newQuantity;
+
+        cancelFromBook(book, orderId);
+
+        return {true, processOrder(updatedOrder)};
+    }
+
 public:
 
     OrderBook() = default;
@@ -162,10 +187,10 @@ public:
     }
 
     std::vector<Trade> processOrder(Order order){
-        if(order.side == Side::Buy)
+        if(order.side == Side::Buy){
             return matchBuyOrder(order);
-        else if(order.side == Side::Sell)
-            return matchSellOrder(order);
+        }
+        return matchSellOrder(order);
     }
 
     bool cancelOrder(std::uint64_t orderId) {
@@ -178,5 +203,24 @@ public:
             return cancelFromBook(bids_, orderId);
         }
         return cancelFromBook(asks_, orderId);
+    }
+
+    ModifyResult modifyOrder(std::uint64_t orderId, 
+                     std::uint64_t newPrice, 
+                     std::uint32_t newQuantity)
+    {
+        if(newQuantity == 0){
+            return {cancelOrder(orderId), {}};
+        }
+
+        auto indexIt = orderIndex_.find(orderId);
+
+        if(indexIt == orderIndex_.end())
+            return {false, {}};
+
+        if(indexIt->second.side == Side::Buy){
+            return modifyOrderFromBook(bids_, orderId, newPrice, newQuantity);
+        }
+        return modifyOrderFromBook(asks_, orderId, newPrice, newQuantity);
     }
 };
