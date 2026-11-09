@@ -13,3 +13,8 @@ struct ModifyResult{
     bool success;
     std::vector<Trade> trades;
 };
+
+struct ProcessResult{
+    bool success;
+    std::vector<Trade> trades;
+};

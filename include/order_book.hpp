@@ -24,7 +24,7 @@ private:
     std::map<std::uint64_t, std::list<Order>> asks_;
     std::unordered_map<std::uint64_t, OrderLocation> orderIndex_; 
 
-    std::vector<Trade> matchBuyOrder(Order& order){
+    ProcessResult matchBuyOrder(Order& order){
         std::vector<Trade> trades;
 
         while(order.quantity > 0 
@@ -62,10 +62,10 @@ private:
             orderIndex_[order.id] = {Side::Buy, order.price, it};
         }
 
-        return trades;
+        return {true, trades};
     }
 
-    std::vector<Trade> matchSellOrder(Order& order){
+    ProcessResult matchSellOrder(Order& order){
         std::vector<Trade> trades;
 
         while(order.quantity > 0 
@@ -103,7 +103,7 @@ private:
             orderIndex_[order.id] = {Side::Sell, order.price, it};
         }
         
-        return trades;
+        return {true, trades};
     }
 
     bool cancelFromBook(auto& book, std::uint64_t orderId) {
@@ -142,7 +142,7 @@ private:
 
         cancelFromBook(book, orderId);
 
-        return {true, processOrder(updatedOrder)};
+        return {true, processOrder(updatedOrder).trades};
     }
 
 public:
@@ -156,7 +156,11 @@ public:
 
     ~OrderBook() = default;
 
-    void addOrder(const Order& order){
+    bool addOrder(const Order& order){
+        if(orderIndex_.find(order.id) != orderIndex_.end()){
+            return false;
+        }
+
         if(order.side == Side::Buy){
             bids_[order.price].push_back(order);
             auto it = std::prev(bids_[order.price].end());
@@ -166,6 +170,8 @@ public:
             auto it = std::prev(asks_[order.price].end());
             orderIndex_[order.id] = {Side::Sell, order.price, it};
         }
+
+        return true;
     }
 
     const Order* bestBid() const{
@@ -186,7 +192,11 @@ public:
         return &it->second.front();
     }
 
-    std::vector<Trade> processOrder(Order order){
+    ProcessResult processOrder(Order order){
+        if(orderIndex_.find(order.id) != orderIndex_.end()){
+            return {false, {}};
+        }
+        
         if(order.side == Side::Buy){
             return matchBuyOrder(order);
         }

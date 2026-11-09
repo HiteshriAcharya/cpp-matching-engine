@@ -38,13 +38,14 @@ void testPartialFillRestingAsk(){
     OrderBook book;
 
     book.addOrder({1, Side::Sell, 100, 10});
-    auto trades = book.processOrder({2, Side::Buy, 105,6});
+    auto result = book.processOrder({2, Side::Buy, 105,6});
 
-    assert(trades.size() == 1);
-    assert(trades[0].buyOrderId == 2);
-    assert(trades[0].sellOrderId == 1);
-    assert(trades[0].price == 100);
-    assert(trades[0].quantity == 6);
+    assert(result.success == true);
+    assert(result.trades.size() == 1);
+    assert(result.trades[0].buyOrderId == 2);
+    assert(result.trades[0].sellOrderId == 1);
+    assert(result.trades[0].price == 100);
+    assert(result.trades[0].quantity == 6);
 
     const Order* bestAsk = book.bestAsk();
 
@@ -58,10 +59,11 @@ void testIncomingOrderRestsAfterPartialFill(){
     OrderBook book;
 
     book.addOrder({1, Side::Sell, 100, 5});
-    auto trades = book.processOrder({2, Side::Buy, 105, 10});
+    auto result = book.processOrder({2, Side::Buy, 105, 10});
 
-    assert(trades.size() == 1);
-    assert(trades[0].quantity == 5);
+    assert(result.success == true);
+    assert(result.trades.size() == 1);
+    assert(result.trades[0].quantity == 5);
 
     assert(book.bestAsk() == nullptr);
     assert(book.bestBid()->id == 2);
@@ -74,11 +76,12 @@ void testFullMatch(){
     OrderBook book;
 
     book.addOrder({1, Side::Buy, 98, 11});
-    auto trades = book.processOrder({2, Side::Sell, 98, 11});
+    auto result = book.processOrder({2, Side::Sell, 98, 11});
 
-    assert(trades.size() == 1);
-    assert(trades[0].quantity == 11);
-    assert(trades[0].price == 98);
+    assert(result.success == true);
+    assert(result.trades.size() == 1);
+    assert(result.trades[0].quantity == 11);
+    assert(result.trades[0].price == 98);
 
     assert(book.bestAsk() == nullptr);
     assert(book.bestBid() == nullptr);
@@ -91,24 +94,25 @@ void testMultiFill(){
     book.addOrder({2, Side::Sell, 100, 4});
     book.addOrder({3, Side::Sell, 101, 5});
 
-    auto trades = book.processOrder({4, Side::Buy, 105, 10});
+    auto result = book.processOrder({4, Side::Buy, 105, 10});
 
-    assert(trades.size() == 3);
+    assert(result.success == true);
+    assert(result.trades.size() == 3);
 
-    assert(trades[0].buyOrderId == 4);
-    assert(trades[0].sellOrderId == 1);
-    assert(trades[0].price == 100);
-    assert(trades[0].quantity == 3);
+    assert(result.trades[0].buyOrderId == 4);
+    assert(result.trades[0].sellOrderId == 1);
+    assert(result.trades[0].price == 100);
+    assert(result.trades[0].quantity == 3);
 
-    assert(trades[1].buyOrderId == 4);
-    assert(trades[1].sellOrderId == 2);
-    assert(trades[1].price == 100);
-    assert(trades[1].quantity == 4);
+    assert(result.trades[1].buyOrderId == 4);
+    assert(result.trades[1].sellOrderId == 2);
+    assert(result.trades[1].price == 100);
+    assert(result.trades[1].quantity == 4);
 
-    assert(trades[2].buyOrderId == 4);
-    assert(trades[2].sellOrderId == 3);
-    assert(trades[2].price == 101);
-    assert(trades[2].quantity == 3);
+    assert(result.trades[2].buyOrderId == 4);
+    assert(result.trades[2].sellOrderId == 3);
+    assert(result.trades[2].price == 101);
+    assert(result.trades[2].quantity == 3);
 
     assert(book.bestAsk() != nullptr);
     assert(book.bestAsk()->id == 3);
@@ -251,6 +255,34 @@ void testModifyNonExistentOrder(){
     assert(result.trades.empty());
 }
 
+void testDuplicateProcessOrderRejected(){
+    OrderBook book;
+
+    assert(book.addOrder({1, Side::Buy, 100, 10}) == true);
+
+    ProcessResult result =
+        book.processOrder({1, Side::Sell, 105, 5});
+
+    assert(result.success == false);
+    assert(result.trades.empty());
+
+    assert(book.bestBid() != nullptr);
+    assert(book.bestBid()->id == 1);
+    assert(book.bestBid()->price == 100);
+}
+
+void testDuplicateAddOrderRejected(){
+    OrderBook book;
+
+    assert(book.addOrder({1, Side::Buy, 100, 10}) == true);
+    assert(book.addOrder({1, Side::Buy, 101, 20}) == false);
+
+    assert(book.bestBid() != nullptr);
+    assert(book.bestBid()->id == 1);
+    assert(book.bestBid()->price == 100);
+    assert(book.bestBid()->quantity == 10);
+}
+
 int main(){
     sequentialTest();
     emptyBookTest();
@@ -267,6 +299,8 @@ int main(){
     testModifyPriceChangeTriggersTrade();
     testModifyZeroQuantityCancelsOrder();
     testModifyNonExistentOrder();
+    testDuplicateProcessOrderRejected();
+    testDuplicateAddOrderRejected();
 
     std::cout << "All tests passed \n";
 }
