@@ -12,3 +12,11 @@ add_executable(order_book_tests
 target_include_directories(order_book_tests PRIVATE
     ${CMAKE_SOURCE_DIR}/include
 )
+
+add_executable(matching_engine_tests
+    tests/test_matching_engine.cpp
+)
+
+target_include_directories(matching_engine_tests PRIVATE
+    ${CMAKE_SOURCE_DIR}/include
+)

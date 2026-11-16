@@ -302,5 +302,5 @@ int main(){
     testDuplicateProcessOrderRejected();
     testDuplicateAddOrderRejected();
 
-    std::cout << "All tests passed \n";
+    std::cout << "OrderBook tests passed \n";
 }

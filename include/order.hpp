@@ -3,8 +3,7 @@
 
 enum class Side{
     Buy,
-    Sell,
-    Cancel
+    Sell
 };
 
 struct Order{
